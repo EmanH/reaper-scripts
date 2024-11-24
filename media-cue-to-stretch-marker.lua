@@ -34,7 +34,6 @@ for i = 0, num_selected_items - 1 do
                     if string.lower(chunk_header) == "cue " then
                         -- Read number of cue points
                         local cue_points_cnt = string.unpack("I", file:read(4))
-                        reaper.ShowConsoleMsg(string.format("Found %d cue points:\n", cue_points_cnt))
                         
                         -- Read each cue point
                         for cp = 1, cue_points_cnt do
@@ -62,7 +61,6 @@ for i = 0, num_selected_items - 1 do
                             
                             if not marker_exists then
                                 reaper.SetTakeStretchMarker(take, -1, cue_time)
-                                reaper.ShowConsoleMsg(string.format("  Added stretch marker at %f seconds\n", cue_time))
                             end
                         end
                     else

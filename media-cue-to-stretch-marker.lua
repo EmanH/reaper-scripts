@@ -1,4 +1,4 @@
-- Get count of selected items
+-- Get count of selected items
 local num_selected_items = reaper.CountSelectedMediaItems(0)
 
 -- Loop through all selected items
@@ -8,7 +8,6 @@ for i = 0, num_selected_items - 1 do
     
     if take then
         local item_pos = reaper.GetMediaItemInfo_Value(item, "D_POSITION")
-        reaper.ShowConsoleMsg(string.format("\nItem %d at position %.2f:\n", i, item_pos))
         
         -- Get media source from take
         local source = reaper.GetMediaItemTake_Source(take)
@@ -43,24 +42,51 @@ for i = 0, num_selected_items - 1 do
                             
                             -- Convert sample offset to time position relative to item
                             local samplerate = reaper.GetMediaSourceSampleRate(source)
-                            local cue_time = Sample_Offset / samplerate
+                            local cue_time = (Sample_Offset / samplerate)
+
                             local item_cue_pos = item_pos + cue_time
                             
-                            -- Check for existing markers within 200ms
+                            -- Find the surrounding stretch markers
+                            local marker_count = reaper.GetTakeNumStretchMarkers(take)
+                            local prev_idx, next_idx = -1, -1
+                            local prev_pos, prev_srcpos = 0, 0
+                            
+                            -- Get source length in seconds
+                            local source_length = reaper.GetMediaSourceLength(source)
+                            local next_pos, next_srcpos = source_length, source_length
+                            
+                            for m = 0, marker_count - 1 do
+                                local _, pos, srcpos = reaper.GetTakeStretchMarker(take, m)
+                                if srcpos <= cue_time then
+                                    prev_idx = m
+                                    prev_pos = pos
+                                    prev_srcpos = srcpos
+                                else
+                                    next_idx = m
+                                    next_pos = pos
+                                    next_srcpos = srcpos
+                                    break
+                                end
+                            end
+                            
+                            -- Calculate effective position using linear interpolation
+                            local ratio = (cue_time - prev_srcpos) / (next_srcpos - prev_srcpos)
+                            local effective_time = prev_pos + (next_pos - prev_pos) * ratio
+                            
+                            -- Check for existing markers within 200ms of the effective time
                             local marker_exists = false
                             local threshold = 0.2 -- 200ms
-                            local marker_count = reaper.GetTakeNumStretchMarkers(take)
                             
                             for m = 0, marker_count - 1 do
                                 local _, pos = reaper.GetTakeStretchMarker(take, m)
-                                if math.abs(pos - cue_time) < threshold then
+                                if math.abs(pos - effective_time) < threshold then
                                     marker_exists = true
                                     break
                                 end
                             end
                             
                             if not marker_exists then
-                                reaper.SetTakeStretchMarker(take, -1, cue_time)
+                                reaper.SetTakeStretchMarker(take, -1, effective_time)
                             end
                         end
                     else
